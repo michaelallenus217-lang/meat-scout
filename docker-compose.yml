@@ -1,0 +1,12 @@
+services:
+  meat-scout:
+    build: .
+    container_name: meat-scout
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    env_file:
+      - .env
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+      - ./scans:/app/scans
