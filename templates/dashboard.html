@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meat Scout</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242736;
+    --border: #2e3145;
+    --text: #e4e4e7;
+    --text-dim: #9ca3af;
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.15);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.15);
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 { font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+  .header h1 span { color: var(--green); }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .status { font-size: 13px; color: var(--text-dim); }
+  .btn {
+    background: var(--green);
+    color: #000;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.loading { animation: pulse 1.5s infinite; }
+  .btn-deals { background: var(--blue); }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+
+  /* MAIN */
+  .main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+
+  /* PRICE GRID */
+  .grid-container {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th {
+    background: var(--surface2);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  th:first-child { min-width: 220px; }
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tr:hover td { background: var(--surface2); }
+  .cut-name { font-weight: 600; color: var(--text); }
+  .cut-category {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .price-cell {
+    text-align: center;
+    font-weight: 600;
+    font-size: 15px;
+    min-width: 120px;
+  }
+  .price-cell.best {
+    color: var(--green);
+    background: var(--green-dim);
+    border-radius: 4px;
+  }
+  .price-cell.near-best {
+    color: #4ade80;
+    background: rgba(34,197,94,0.08);
+    border-radius: 4px;
+  }
+  .price-cell.worst {
+    color: var(--red);
+  }
+  .price-cell .date {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-dim);
+    display: block;
+  }
+  .price-cell .sale {
+    font-size: 10px;
+    color: var(--amber);
+    display: block;
+  }
+  .no-price { color: var(--text-dim); font-style: italic; font-weight: 400; font-size: 13px; }
+
+  /* TREND SECTION */
+  .trends-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .trends-header h2 { font-size: 18px; font-weight: 600; }
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 16px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .chart-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+  }
+  .chart-card canvas { width: 100% !important; height: 200px !important; }
+
+  /* LOADING */
+  .loading-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 0;
+    color: var(--text-dim);
+    font-size: 15px;
+  }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SECTION DIVIDERS */
+  .section-row td {
+    background: var(--surface2);
+    padding: 8px 16px;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    border-bottom: 2px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>MEAT <span>SCOUT</span></h1>
+  <div class="header-right">
+    <span class="status" id="status">Loading...</span>
+    <button class="btn" id="refreshBtn" onclick="refreshPrices()">Refresh Prices</button>
+    <button class="btn btn-deals" id="dealsBtn" onclick="sendDeals()">Send Deals Email</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- PRICE GRID -->
+  <div class="grid-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Cut</th>
+          {% for store in stores %}
+          <th>{{ store }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody id="priceGrid">
+        <tr><td colspan="{{ stores|length + 1 }}">
+          <div class="loading-overlay"><div class="spinner"></div>Loading prices...</div>
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TRENDS -->
+  <div class="trends-header">
+    <h2>Price Trends</h2>
+  </div>
+  <div class="chart-grid" id="chartGrid">
+    <div class="loading-overlay"><div class="spinner"></div>Loading history...</div>
+  </div>
+</div>
+
+<script>
+const CUTS = {{ cuts | tojson }};
+const STORES = {{ stores | tojson }};
+
+// Category grouping for section headers
+const CATEGORIES = {
+  "Poultry": ["Chicken Breast Boneless Skinless", "Chicken Thighs Boneless Skinless", "Whole Chicken"],
+  "Pork": ["Pork Tenderloin", "Pork Loin", "Pork Chops"],
+  "Beef": ["Ground Beef", "Chuck Roast", "Sirloin"],
+  "Seafood": ["Salmon", "Shrimp", "Sole", "Flounder"],
+};
+
+// Store colors for charts
+const STORE_COLORS = {
+  "Safeway": "#ef4444",
+  "Fred Meyer": "#3b82f6",
+  "WinCo": "#f59e0b",
+  "Costco": "#8b5cf6",
+  "Trader Joe's": "#22c55e",
+  "Stadium Thriftway": "#ec4899",
+  "Commissary (JBLM)": "#14b8a6",
+};
+
+let charts = {};
+
+async function loadPrices() {
+  try {
+    const resp = await fetch("/api/prices");
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    renderGrid(data.prices);
+  } catch (err) {
+    document.getElementById("priceGrid").innerHTML =
+      `<tr><td colspan="${STORES.length + 1}" style="padding:40px;text-align:center;color:var(--red);">
+        Error loading prices: ${err.message}</td></tr>`;
+  }
+}
+
+function renderGrid(prices) {
+  const tbody = document.getElementById("priceGrid");
+  let html = "";
+
+  for (const [category, cuts] of Object.entries(CATEGORIES)) {
+    html += `<tr class="section-row"><td colspan="${STORES.length + 1}">${category}</td></tr>`;
+
+    for (const cut of cuts) {
+      const storeData = prices[cut] || {};
+
+      // Find best (lowest) price for this cut
+      let bestPrice = Infinity;
+      let worstPrice = 0;
+      for (const store of STORES) {
+        const d = storeData[store];
+        if (d && d.price_per_lb) {
+          if (d.price_per_lb < bestPrice) bestPrice = d.price_per_lb;
+          if (d.price_per_lb > worstPrice) worstPrice = d.price_per_lb;
+        }
+      }
+
+      html += `<tr><td class="cut-name">${cut}</td>`;
+      for (const store of STORES) {
+        const d = storeData[store];
+        if (d && d.price_per_lb) {
+          const diff = d.price_per_lb - bestPrice;
+          const isBest = diff <= 0.05 && bestPrice < Infinity;
+          const isNearBest = diff > 0.05 && diff <= 0.10 && bestPrice < Infinity;
+          const isWorst = d.price_per_lb === worstPrice && worstPrice > bestPrice + 0.10;
+          const cls = isBest ? "best" : (isNearBest ? "near-best" : (isWorst ? "worst" : ""));
+          const sale = d.sale_end_date ? `<span class="sale">sale ends ${d.sale_end_date}</span>` : "";
+          const dateStr = d.date ? `<span class="date">${d.date}</span>` : "";
+          html += `<td class="price-cell ${cls}">$${d.price_per_lb.toFixed(2)}/lb${dateStr}${sale}</td>`;
+        } else {
+          html += `<td class="price-cell"><span class="no-price">--</span></td>`;
+        }
+      }
+      html += `</tr>`;
+    }
+  }
+
+  tbody.innerHTML = html;
+  document.getElementById("status").textContent = "Prices loaded";
+}
+
+async function loadHistory() {
+  try {
+    const resp = await fetch("/api/history");
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    renderCharts(data.history);
+  } catch (err) {
+    document.getElementById("chartGrid").innerHTML =
+      `<div style="padding:40px;color:var(--red);">Error loading history: ${err.message}</div>`;
+  }
+}
+
+function renderCharts(history) {
+  const grid = document.getElementById("chartGrid");
+  grid.innerHTML = "";
+
+  for (const cut of CUTS) {
+    const data = history[cut] || [];
+    if (data.length === 0) continue;
+
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.innerHTML = `<h3>${cut}</h3><canvas id="chart-${cut.replace(/\s+/g, '-')}"></canvas>`;
+    grid.appendChild(card);
+
+    const canvas = card.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+
+    // Group by store
+    const byStore = {};
+    for (const d of data) {
+      if (!byStore[d.store]) byStore[d.store] = [];
+      byStore[d.store].push({ x: d.date, y: d.price_per_lb });
+    }
+
+    const datasets = [];
+    for (const [store, points] of Object.entries(byStore)) {
+      datasets.push({
+        label: store,
+        data: points,
+        borderColor: STORE_COLORS[store] || "#888",
+        backgroundColor: "transparent",
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.3,
+      });
+    }
+
+    charts[cut] = new Chart(ctx, {
+      type: "line",
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { color: "#9ca3af", font: { size: 11 }, boxWidth: 12, padding: 8 },
+          },
+        },
+        scales: {
+          x: {
+            type: "category",
+            ticks: { color: "#9ca3af", font: { size: 10 }, maxRotation: 45 },
+            grid: { color: "rgba(255,255,255,0.05)" },
+          },
+          y: {
+            ticks: {
+              color: "#9ca3af",
+              font: { size: 11 },
+              callback: v => "$" + v.toFixed(2),
+            },
+            grid: { color: "rgba(255,255,255,0.05)" },
+          },
+        },
+      },
+    });
+  }
+
+  if (grid.children.length === 0) {
+    grid.innerHTML = `<div style="padding:40px;color:var(--text-dim);">No history yet. Click "Refresh Prices" to start tracking.</div>`;
+  }
+}
+
+function setButtons(disabled) {
+  for (const id of ["refreshBtn", "dealsBtn"]) {
+    const btn = document.getElementById(id);
+    btn.disabled = disabled;
+    if (disabled) btn.classList.add("loading");
+    else btn.classList.remove("loading");
+  }
+}
+
+async function refreshPrices() {
+  const btn = document.getElementById("refreshBtn");
+  const status = document.getElementById("status");
+  setButtons(true);
+  btn.textContent = "Refreshing...";
+  status.textContent = "Loading everyday prices...";
+
+  try {
+    const resp = await fetch("/api/refresh", { method: "POST" });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    pollStatus(() => { btn.textContent = "Refresh Prices"; });
+  } catch (err) {
+    status.textContent = `Error: ${err.message}`;
+    setButtons(false);
+    btn.textContent = "Refresh Prices";
+  }
+}
+
+async function sendDeals() {
+  const btn = document.getElementById("dealsBtn");
+  const status = document.getElementById("status");
+  setButtons(true);
+  btn.textContent = "Sending...";
+  status.textContent = "Scraping sale deals...";
+
+  try {
+    const resp = await fetch("/api/send-deals", { method: "POST" });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    pollStatus(() => { btn.textContent = "Send Deals Email"; });
+  } catch (err) {
+    status.textContent = `Error: ${err.message}`;
+    setButtons(false);
+    btn.textContent = "Send Deals Email";
+  }
+}
+
+function pollStatus(onDone) {
+  const status = document.getElementById("status");
+
+  const check = async () => {
+    try {
+      const resp = await fetch("/api/status");
+      const data = await resp.json();
+      status.textContent = data.message;
+
+      if (data.running) {
+        setTimeout(check, 2000);
+      } else {
+        setButtons(false);
+        onDone();
+        await loadPrices();
+        await loadHistory();
+      }
+    } catch {
+      setTimeout(check, 3000);
+    }
+  };
+
+  setTimeout(check, 2000);
+}
+
+// Initial load
+loadPrices();
+loadHistory();
+</script>
+
+</body>
+</html>
